@@ -39,10 +39,10 @@ window.addEventListener('error', function (e) {
     record('err');
 }, true);
 
-setInterval(function () {
-    // 每一段时间自动打点
-    record('tick');
-}, 60 * 1000 * 42);
+//setInterval(function () {
+//    // 每一段时间自动打点
+//    record('tick');
+//}, 86400 * 1000 * 7);
 
 setInterval(function () {
     send();

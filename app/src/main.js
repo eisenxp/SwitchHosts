@@ -351,6 +351,7 @@ var app = new Vue({
                         bindingStr = hostLine;
                     } else {
                         bindingStr = hostLine.substring(0, wellIndex);
+                        bindingStr = bindingStr.trim();
                     }
                     var pair =  bindingStr.split(/\s+/); // 用空格进行分割
                     if (pair.length != 2) {

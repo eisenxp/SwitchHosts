@@ -369,8 +369,9 @@ var app = new Vue({
             var hostMapping = {}  // 保存最终有效的绑定
             for (var fileIndex = onHosts.length - 1; fileIndex >= 0; fileIndex--) {
                 var currentHostsContent = onHosts[fileIndex];
-                currentHostsContent.split(splitRegex).forEach(function (line, lineIndex) {  // 按换行分割文本
-                    var bindingPair = _this.splitHostLineForHostBindingPair(line);
+                var lines = currentHostsContent.split(splitRegex); // 换行分割文本
+                for (var lineIndex = lines.length - 1; lineIndex >=0; lineIndex--) {
+                    var bindingPair = _this.splitHostLineForHostBindingPair(lines[lineIndex]);
                     if (bindingPair != null) {
                         var ip = bindingPair[0];
                         var host = bindingPair[1];
@@ -379,19 +380,18 @@ var app = new Vue({
                             hostMapping[host] = {'ip': ip, 'host': host, 'fileIndex': fileIndex};
                         }
                     }
-                });
+                }
             }
 
-            //var logResult = '';
-            //for (var p in hostMapping) {
-            //    logResult += (p + ':' + hostMapping[p].ip + ':' + hostMapping[p].fileIndex + '\n');
-            //}
-            //agent.writeFile('/tmp/hostMapping.log', logResult);
-
-            //var actionLogs = [];
+            var hostMappingResult = '';
+            var actionLogs = [];
+            for (var p in hostMapping) {
+                hostMappingResult += (p + ':' + hostMapping[p].ip + ':' + hostMapping[p].fileIndex + '\n');
+            }
+            hostMappingResult += '\n\n\n\n';
 
             var resultContentLines = [];
-            resultContentLines.push("# SwitchHosts! (Cascading Edition by Eisen.)");
+            resultContentLines.push("# SwitchHosts! (Cascading Edition by Eisen.)\n\n");
             onHosts.forEach(function (oneHostContent, hostFileIndex) {
                 oneHostContent.split(splitRegex).forEach(function (line, lineIndex) {  // 按换行分割文本
                     line = line.trim();
@@ -408,15 +408,15 @@ var app = new Vue({
                                if (existConfig.ip == ip && existConfig.host == host && existConfig.fileIndex == hostFileIndex) {
                                    resultContentLines.push(line);  // 在最终有效的host绑定范围内的记录，才放到结果集
                                }else {
-                                   //actionLogs.push(ip+':'+host+':'+hostFileIndex+'|'+existConfig.ip+':'+existConfig.host+':'+existConfig.fileIndex);
+                                   actionLogs.push(ip+':'+host+':'+hostFileIndex+'|'+existConfig.ip+':'+existConfig.host+':'+existConfig.fileIndex);
                                }
                            }
                        }
                     }
                 });
-                resultContentLines.push("\n# --------------------\n");
+                resultContentLines.push("\n# --------------------------------------------\n");
             });
-            //agent.writeFile('/tmp/result.log', actionLogs.join('\n'));
+            agent.writeFile('/tmp/switchhosts.log', hostMappingResult + actionLogs.join('\n'));
             return resultContentLines.join('\n');
         },
         caculateHosts: function (host, callback) {

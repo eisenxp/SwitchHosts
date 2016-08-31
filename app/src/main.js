@@ -339,6 +339,85 @@ var app = new Vue({
                 }
             }
         },
+        splitHostLineForHostBindingPair: function (hostLine) {
+            hostLine = hostLine.trim();
+            if (hostLine != "") {  // 只处理非空行
+                var wellIndex = hostLine.indexOf('#');
+                if (wellIndex == 0) {
+                    return null;  // 整行注释的，不做分割
+                } else {
+                    var bindingStr;
+                    if (wellIndex == -1) {  // 没有注释，整行都是host绑定
+                        bindingStr = hostLine;
+                    } else {
+                        bindingStr = hostLine.substring(0, wellIndex);
+                    }
+                    var pair =  bindingStr.split(/\s+/); // 用空格进行分割
+                    if (pair.length != 2) {
+                        return null;
+                    }
+                    return pair;
+                }
+            }
+        },
+        genFinalHostsContent: function (onHosts) {
+            var _this = this;
+            // 合并所有处于启用状态的host绑定，并且按照优先级进行host覆盖，越往后的hosts文件优先级越高
+            var splitRegex = /\n|\r/;
+            // 按照文件逆序定义优先级
+            var hostMapping = {}  // 保存最终有效的绑定
+            for (var fileIndex = onHosts.length - 1; fileIndex >= 0; fileIndex--) {
+                var currentHostsContent = onHosts[fileIndex];
+                currentHostsContent.split(splitRegex).forEach(function (line, lineIndex) {  // 按换行分割文本
+                    var bindingPair = _this.splitHostLineForHostBindingPair(line);
+                    if (bindingPair != null) {
+                        var ip = bindingPair[0];
+                        var host = bindingPair[1];
+                        var existConfig = hostMapping[host];
+                        if (typeof(existConfig) == 'undefined') {  // 这里控制只能设置一次
+                            hostMapping[host] = {'ip': ip, 'host': host, 'fileIndex': fileIndex};
+                        }
+                    }
+                });
+            }
+
+            //var logResult = '';
+            //for (var p in hostMapping) {
+            //    logResult += (p + ':' + hostMapping[p].ip + ':' + hostMapping[p].fileIndex + '\n');
+            //}
+            //agent.writeFile('/tmp/hostMapping.log', logResult);
+
+            //var actionLogs = [];
+
+            var resultContentLines = [];
+            resultContentLines.push("# SwitchHosts! (Cascading Edition by Eisen.)");
+            onHosts.forEach(function (oneHostContent, hostFileIndex) {
+                oneHostContent.split(splitRegex).forEach(function (line, lineIndex) {  // 按换行分割文本
+                    line = line.trim();
+                    if (line != "") {  // 只处理非空行
+                       var wellIndex = line.indexOf('#');
+                       if (wellIndex == 0) {
+                           resultContentLines.push(line);  // 已经注释的，原样放到结果
+                       } else {
+                           var bindingPair = _this.splitHostLineForHostBindingPair(line);
+                           if (bindingPair != null) {
+                               var ip = bindingPair[0];
+                               var host = bindingPair[1];
+                               var existConfig = hostMapping[host];
+                               if (existConfig.ip == ip && existConfig.host == host && existConfig.fileIndex == hostFileIndex) {
+                                   resultContentLines.push(line);  // 在最终有效的host绑定范围内的记录，才放到结果集
+                               }else {
+                                   //actionLogs.push(ip+':'+host+':'+hostFileIndex+'|'+existConfig.ip+':'+existConfig.host+':'+existConfig.fileIndex);
+                               }
+                           }
+                       }
+                    }
+                });
+                resultContentLines.push("\n# --------------------\n");
+            });
+            //agent.writeFile('/tmp/result.log', actionLogs.join('\n'));
+            return resultContentLines.join('\n');
+        },
         caculateHosts: function (host, callback) {
             var on_hosts = [];
             var _this = this;
@@ -349,9 +428,7 @@ var app = new Vue({
                 }
             });
 
-            var s_hosts = on_hosts.join('\n\n# --------------------\n\n');
-            s_hosts = '# SwitchHosts!\n' + s_hosts;
-            agent.setSysHosts(s_hosts, this.sudo_pswd, function (err) {
+            agent.setSysHosts(this.genFinalHostsContent(on_hosts), this.sudo_pswd, function (err) {
                 if (err) {
                     //_this.log(err);
                     // get permission
